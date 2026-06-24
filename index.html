@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>🎛️ サウンドボード</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@400;700&display=swap');
+
+    :root {
+      --bg:        #0d0f14;
+      --surface:   #161922;
+      --panel:     #1e2230;
+      --border:    #2a2f42;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #7c3aed;
+      --accent-hi: #a855f7;
+      --danger:    #ef4444;
+      --success:   #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans JP', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.2rem;
+      color: var(--accent-hi);
+      letter-spacing: 0.08em;
+    }
+    .logo span { color: var(--muted); font-size: 0.75rem; margin-left: 8px; }
+
+    /* volume + stop */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .vol-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 80px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent-hi);
+      cursor: pointer;
+    }
+    .btn-stop {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-stop:hover { background: rgba(239,68,68,.15); }
+
+    /* ── Main ── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+
+    /* section label */
+    .section-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Pad Grid ── */
+    .pad-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+
+    .pad {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 12px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      transition: transform .1s, box-shadow .1s, border-color .15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pad:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 4px 20px rgba(124,58,237,.25);
+    }
+    .pad:active, .pad.playing {
+      transform: scale(.96);
+    }
+    .pad.playing {
+      border-color: var(--accent-hi);
+      box-shadow: 0 0 0 2px var(--accent-hi), 0 0 24px rgba(168,85,247,.4);
+    }
+    .pad-glow {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+    .pad.playing .pad-glow { opacity: 1; }
+
+    .pad-emoji { font-size: 2rem; line-height: 1; }
+    .pad-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-align: center;
+      color: var(--text);
+    }
+
+    /* progress bar inside pad */
+    .pad-progress {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 3px;
+      width: 0%;
+      border-radius: 0 0 10px 10px;
+      transition: width .05s linear;
+    }
+
+    /* user pad: delete btn */
+    .pad-delete {
+      position: absolute;
+      top: 6px; right: 8px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity .15s, color .15s;
+      line-height: 1;
+    }
+    .pad:hover .pad-delete { opacity: 1; }
+    .pad-delete:hover { color: var(--danger) !important; }
+
+    /* pad controls: volume + loop */
+    .pad-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .pad-vol {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .pad-vol::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      background: var(--muted);
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .pad-vol:hover::-webkit-slider-thumb { background: var(--accent-hi); }
+    .pad-loop {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.65rem;
+      border-radius: 4px;
+      padding: 2px 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .15s, color .15s, background .15s;
+      line-height: 1.4;
+    }
+    .pad-loop:hover { border-color: var(--accent); color: var(--accent-hi); }
+    .pad-loop.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .pad-vol-label {
+      font-size: 0.6rem;
+      color: var(--muted);
+      font-family: 'Share Tech Mono', monospace;
+      min-width: 26px;
+      text-align: right;
+    }
+
+    /* ── Add Panel ── */
+    .add-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative; /* 子要素のabsolute指定のため追加 */
+    }
+    .add-panel h3 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      color: var(--accent-hi);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: .05em;
+    }
+    .form-group input, .form-group select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      outline: none;
+      font-family: inherit;
+      transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--accent);
+    }
+
+    /* file drop area */
+    .drop-zone {
+      background: var(--bg);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      grid-column: 1 / -1;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(124,58,237,.07);
+      color: var(--text);
+    }
+    
+    /* 【修正箇所1】スマホでクリック無効化を防ぐための透明化 */
+    .drop-zone input { 
+      position: absolute; 
+      width: 0; 
+      height: 0; 
+      opacity: 0; 
+    }
+    
+    .drop-zone .dz-icon { font-size: 1.5rem; display: block; margin-bottom: 6px; }
+    .drop-zone .dz-filename {
+      color: var(--accent-hi);
+      font-weight: 700;
+      display: none;
+    }
+
+    .btn-add {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      white-space: nowrap;
+      height: fit-content;
+    }
+    .btn-add:hover { background: var(--accent-hi); }
+    .btn-add:active { transform: scale(.97); }
+    .btn-add:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* emoji picker strip */
+    .emoji-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .emoji-chip {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: border-color .1s;
+    }
+    .emoji-chip:hover, .emoji-chip.selected {
+      border-color: var(--accent-hi);
+    }
+
+    /* color strip */
+    .color-strip {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .color-chip {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform .1s, border-color .1s;
+    }
+    .color-chip:hover { transform: scale(1.2); }
+    .color-chip.selected { border-color: #fff; }
+
+    /* toast */
+    #toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s, transform .2s;
+      z-index: 999;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Mobile (iPhone SE ~375px) ── */
+    @media (max-width: 430px) {
+      header { padding: 10px 14px; }
+      .logo { font-size: 1rem; }
+      .logo span { display: none; }
+      .vol-wrap { gap: 5px; }
+      input[type=range] { width: 60px; }
+      .btn-stop { padding: 6px 10px; font-size: 0.75rem; }
+
+      main { padding: 16px 12px 80px; }
+
+      /* 2列グリッド：ボタンが大きく押しやすい */
+      .pad-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 24px; }
+
+      .pad { padding: 16px 10px 12px; gap: 6px; }
+      .pad-emoji { font-size: 2.2rem; }
+      .pad-label { font-size: 0.82rem; }
+
+      /* スライダーのつまみを大きく（指で操作しやすく） */
+      .pad-vol { height: 4px; }
+      .pad-vol::-webkit-slider-thumb { width: 18px; height: 18px; }
+      .pad-vol-label { font-size: 0.65rem; min-width: 28px; }
+
+      /* ループボタンを大きく */
+      .pad-loop { font-size: 0.75rem; padding: 4px 8px; }
+
+      /* 削除ボタンはスマホでは常時表示 */
+      .pad-delete { opacity: 1; font-size: 0.9rem; top: 7px; right: 9px; }
+
+      /* 追加パネル */
+      .add-panel { padding: 16px 14px; }
+      .add-panel h3 { font-size: 1rem; margin-bottom: 14px; }
+      .form-row { grid-template-columns: 1fr; gap: 10px; }
+      .btn-add { width: 100%; padding: 13px; font-size: 0.95rem; }
+      .drop-zone { padding: 22px 12px; font-size: 0.85rem; }
+      .drop-zone .dz-icon { font-size: 2rem; }
+
+      /* 絵文字・カラーチップを大きく */
+      .emoji-chip { font-size: 1.4rem; padding: 6px 10px; }
+      .color-chip { width: 30px; height: 30px; }
+
+      /* 入力欄を大きく（iOS zoom防止のためfont-size 16px以上） */
+      .form-group input, .form-group select {
+        font-size: 16px;
+        padding: 12px 14px;
+      }
+
+      .section-label { font-size: 0.68rem; margin-bottom: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎛️ SOUNDBOARD <span>v1.0</span></div>
+  <div class="controls">
+    <div class="vol-wrap">
+      🔊
+      <input type="range" id="volume" min="0" max="1" step="0.05" value="0.8">
+    </div>
+    <button class="btn-stop" id="stopAll">■ 全停止</button>
+  </div>
+</header>
+
+<main>
+  <div class="section-label">プリセット</div>
+  <div class="pad-grid" id="presetGrid"></div>
+
+  <div class="section-label" id="userLabel" style="display:none">マイサウンド</div>
+  <div class="pad-grid" id="userGrid"></div>
+
+  <div class="add-panel">
+    <h3>＋ サウンドを追加</h3>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="audio/*, .mp3, .wav, .ogg, .m4a, .aac">
+      <span class="dz-icon">🎵</span>
+      クリックまたはドラッグ＆ドロップで音声ファイルを選択<br>
+      <small>MP3 / WAV / OGG / M4A 対応</small>
+      <div class="dz-filename" id="dzFilename"></div>
+    </div>
+
+    <div class="form-row" style="margin-top:14px">
+      <div class="form-group">
+        <label>ボタン名</label>
+        <input type="text" id="soundLabel" placeholder="例：効果音A" maxlength="16">
+      </div>
+      <div class="form-group">
+        <label>絵文字</label>
+        <input type="text" id="soundEmoji" value="🔊" maxlength="2" style="text-align:center;font-size:1rem;padding:9px 6px;">
+      </div>
+      <button class="btn-add" id="addBtn" disabled>追加</button>
+    </div>
+
+    <div class="emoji-strip" id="emojiStrip"></div>
+    <div class="color-strip" id="colorStrip"></div>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── Config ──────────────────────────────────────────────
+const STORAGE_KEY = 'soundboard_user_sounds_v1';
+const EMOJIS = ['🔊','🎵','🎶','🎸','🥁','🎺','🎷','🎹','🔔','💥','⚡','🔥','💣','🎉','👏','😂','😱','😎','🚨','🏆'];
+const COLORS = ['#f59e0b','#ef4444','#8b5cf6','#06b6d4','#10b981','#f97316','#ec4899','#3b82f6','#84cc16','#64748b'];
+
+let currentAudios = [];
+let selectedFile = null;
+let selectedEmoji = '🔊';
+let selectedColor = COLORS[0];
+
+// ── Render emoji & color strips ──────────────────────────
+const emojiStrip = document.getElementById('emojiStrip');
+EMOJIS.forEach(e => {
+  const ch = document.createElement('button');
+  ch.className = 'emoji-chip' + (e === selectedEmoji ? ' selected' : '');
+  ch.textContent = e;
+  ch.onclick = () => {
+    selectedEmoji = e;
+    document.getElementById('soundEmoji').value = e;
+    emojiStrip.querySelectorAll('.emoji-chip').forEach(x => x.classList.remove('selected'));
+    ch.classList.add('selected');
+  };
+  emojiStrip.appendChild(ch);
+});
+
+const colorStrip = document.getElementById('colorStrip');
+COLORS.forEach((c, i) => {
+  const ch = document.createElement('button');
+  ch.className = 'color-chip' + (i === 0 ? ' selected' : '');
+  ch.style.background = c;
+  ch.title = c;
+  ch.onclick = () => {
+    selectedColor = c;
+    colorStrip.querySelectorAll('.color-chip').forEach(x => x.classList.remove('selected'));
+    ch.classList.add('selected');
+  };
+  colorStrip.appendChild(ch);
+});
+
+// ── Load presets from sounds.json ─────────────────────────
+async function loadPresets() {
+  const base = location.href.replace(/\/[^/]*$/, '/');
+  const url  = base + 'sounds.json';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderPads(data, document.getElementById('presetGrid'), false);
+  } catch (e) {
+    console.warn('sounds.json load failed:', e);
+    document.getElementById('presetGrid').innerHTML =
+      '<p style="color:var(--muted);font-size:.85rem;grid-column:1/-1;line-height:1.7">プリセットの確認ができません。俺くんまでご連絡ください。<br><small style=\"font-size:.75rem;opacity:.6\">※現在プリセット登録は俺くんしかできない仕様です。サウンドの追加は端末保存なので引き続き可能です。</small></p>';
+  }
+}
+
+// ── Load user sounds from localStorage ──────────────────
+function loadUserSounds() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch { return []; }
+}
+function saveUserSounds(arr) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+
+function renderUserSounds() {
+  const arr = loadUserSounds();
+  const grid = document.getElementById('userGrid');
+  const label = document.getElementById('userLabel');
+  grid.innerHTML = '';
+  label.style.display = arr.length ? 'flex' : 'none';
+  renderPads(arr, grid, true);
+}
+
+// ── Render pads ──────────────────────────────────────────
+function renderPads(sounds, container, isDeletable) {
+  sounds.forEach(s => {
+    const pad = document.createElement('div');
+    pad.className = 'pad';
+    pad.dataset.id = s.id;
+
+    const glow = document.createElement('div');
+    glow.className = 'pad-glow';
+    glow.style.background = `radial-gradient(circle at 50% 40%, ${s.color}33, transparent 70%)`;
+
+    const prog = document.createElement('div');
+    prog.className = 'pad-progress';
+    prog.style.background = s.color;
+
+    const emoji = document.createElement('div');
+    emoji.className = 'pad-emoji';
+    emoji.textContent = s.emoji || '🔊';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'pad-label';
+    lbl.textContent = s.label;
+
+    const controls = document.createElement('div');
+    controls.className = 'pad-controls';
+
+    const volSlider = document.createElement('input');
+    volSlider.type = 'range';
+    volSlider.className = 'pad-vol';
+    volSlider.min = 0; volSlider.max = 1; volSlider.step = 0.05;
+    volSlider.value = 0.8;
+
+    const volLabel = document.createElement('span');
+    volLabel.className = 'pad-vol-label';
+    volLabel.textContent = '80%';
+
+    volSlider.oninput = (e) => {
+      e.stopPropagation();
+      volLabel.textContent = Math.round(volSlider.value * 100) + '%';
+      if (pad._audio) pad._audio.volume = parseFloat(volSlider.value);
+    };
+    volSlider.onclick = (e) => e.stopPropagation();
+
+    const loopBtn = document.createElement('button');
+    loopBtn.className = 'pad-loop';
+    loopBtn.textContent = '🔁';
+    loopBtn.title = 'ループ';
+    loopBtn._loop = false;
+    loopBtn.onclick = (e) => {
+      e.stopPropagation();
+      loopBtn._loop = !loopBtn._loop;
+      loopBtn.classList.toggle('active', loopBtn._loop);
+      if (pad._audio) pad._audio.loop = loopBtn._loop;
+    };
+
+    controls.appendChild(volSlider);
+    controls.appendChild(volLabel);
+    controls.appendChild(loopBtn);
+
+    pad.appendChild(glow);
+    pad.appendChild(prog);
+    pad.appendChild(emoji);
+    pad.appendChild(lbl);
+    pad.appendChild(controls);
+
+    if (isDeletable) {
+      const del = document.createElement('button');
+      del.className = 'pad-delete';
+      del.textContent = '✕';
+      del.title = '削除';
+      del.onclick = (e) => {
+        e.stopPropagation();
+        deleteUserSound(s.id);
+      };
+      pad.appendChild(del);
+    }
+
+    pad.onclick = () => playSound(s, pad, prog, volSlider, loopBtn);
+    container.appendChild(pad);
+  });
+}
+
+// ── Play ─────────────────────────────────────────────────
+function playSound(s, pad, prog, volSlider, loopBtn) {
+  if (pad._audio && !pad._audio.paused) {
+    pad._audio.pause();
+    pad._audio.currentTime = 0;
+    pad.classList.remove('playing');
+    prog.style.width = '0%';
+    return;
+  }
+
+  let audio;
+  if (s.dataUrl) {
+    audio = new Audio(s.dataUrl);
+  } else {
+    const base = location.href.replace(/\/[^\/]*$/, '/');
+    audio = new Audio(base + s.file);
+  }
+
+  const vol = volSlider
+    ? parseFloat(volSlider.value)
+    : parseFloat(document.getElementById('volume').value);
+  audio.volume = vol;
+  audio.loop = loopBtn ? loopBtn._loop : false;
+
+  pad.classList.add('playing');
+  currentAudios.push(audio);
+  pad._audio = audio;
+
+  audio.play().catch(() => toast('⚠ 音声ファイルが読み込めませんでした'));
+
+  audio.addEventListener('timeupdate', () => {
+    if (audio.duration) {
+      prog.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    }
+  });
+  audio.addEventListener('ended', () => {
+    if (!audio.loop) {
+      pad.classList.remove('playing');
+      prog.style.width = '0%';
+    }
+  });
+}
+
+// ── Stop all ─────────────────────────────────────────────
+document.getElementById('stopAll').onclick = () => {
+  currentAudios.forEach(a => { a.pause(); a.currentTime = 0; });
+  currentAudios = [];
+  document.querySelectorAll('.pad').forEach(p => p.classList.remove('playing'));
+  document.querySelectorAll('.pad-progress').forEach(p => p.style.width = '0%');
+};
+
+// ── File drop / pick ─────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.onclick = () => fileInput.click();
+dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
+dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+dropZone.ondrop = (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+};
+fileInput.onchange = () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); };
+
+// 【修正箇所3】M4Aなどの拡張子にも寛容な判定にする
+function handleFile(f) {
+  const validExts = ['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'];
+  const isAudioType = f.type.startsWith('audio/');
+  const hasAudioExt = validExts.some(ext => f.name.toLowerCase().endsWith(ext));
+
+  if (!isAudioType && !hasAudioExt) { 
+    toast('音声ファイルを選んでください（MP3, WAV, M4Aなど）'); 
+    return; 
+  }
+  
+  selectedFile = f;
+  document.getElementById('dzFilename').textContent = '✓ ' + f.name;
+  document.getElementById('dzFilename').style.display = 'block';
+  if (!document.getElementById('soundLabel').value) {
+    document.getElementById('soundLabel').value = f.name.replace(/\.[^.]+$/, '').slice(0, 16);
+  }
+  document.getElementById('addBtn').disabled = false;
+}
+
+// ── Add user sound ────────────────────────────────────────
+document.getElementById('addBtn').onclick = () => {
+  const label = document.getElementById('soundLabel').value.trim() || selectedFile.name;
+  const emoji = document.getElementById('soundEmoji').value || selectedEmoji;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const arr = loadUserSounds();
+    const newSound = {
+      id: 'user_' + Date.now(),
+      label,
+      emoji,
+      color: selectedColor,
+      dataUrl: ev.target.result
+    };
+    arr.push(newSound);
+    saveUserSounds(arr);
+    renderUserSounds();
+    resetForm();
+    toast('✓ 追加しました：' + label);
+  };
+  reader.readAsDataURL(selectedFile);
+};
+
+function resetForm() {
+  selectedFile = null;
+  document.getElementById('soundLabel').value = '';
+  document.getElementById('soundEmoji').value = '🔊';
+  document.getElementById('dzFilename').style.display = 'none';
+  document.getElementById('dzFilename').textContent = '';
+  document.getElementById('addBtn').disabled = true;
+  fileInput.value = '';
+}
+
+// ── Delete user sound ─────────────────────────────────────
+function deleteUserSound(id) {
+  const arr = loadUserSounds().filter(s => s.id !== id);
+  saveUserSounds(arr);
+  renderUserSounds();
+  toast('削除しました');
+}
+
+// ── Toast ─────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadPresets();
+renderUserSounds();
+</script>
+</body>
+</html>
