@@ -253,7 +253,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
-      position: relative; /* 子要素のabsolute指定のため追加 */
+      position: relative;
     }
     .add-panel h3 {
       font-size: 0.9rem;
@@ -307,7 +307,6 @@
       color: var(--text);
     }
     
-    /* 【修正箇所1】スマホでクリック無効化を防ぐための透明化 */
     .drop-zone input { 
       position: absolute; 
       width: 0; 
@@ -408,25 +407,20 @@
 
       main { padding: 16px 12px 80px; }
 
-      /* 2列グリッド：ボタンが大きく押しやすい */
       .pad-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 24px; }
 
       .pad { padding: 16px 10px 12px; gap: 6px; }
       .pad-emoji { font-size: 2.2rem; }
       .pad-label { font-size: 0.82rem; }
 
-      /* スライダーのつまみを大きく（指で操作しやすく） */
       .pad-vol { height: 4px; }
       .pad-vol::-webkit-slider-thumb { width: 18px; height: 18px; }
       .pad-vol-label { font-size: 0.65rem; min-width: 28px; }
 
-      /* ループボタンを大きく */
       .pad-loop { font-size: 0.75rem; padding: 4px 8px; }
 
-      /* 削除ボタンはスマホでは常時表示 */
       .pad-delete { opacity: 1; font-size: 0.9rem; top: 7px; right: 9px; }
 
-      /* 追加パネル */
       .add-panel { padding: 16px 14px; }
       .add-panel h3 { font-size: 1rem; margin-bottom: 14px; }
       .form-row { grid-template-columns: 1fr; gap: 10px; }
@@ -434,11 +428,9 @@
       .drop-zone { padding: 22px 12px; font-size: 0.85rem; }
       .drop-zone .dz-icon { font-size: 2rem; }
 
-      /* 絵文字・カラーチップを大きく */
       .emoji-chip { font-size: 1.4rem; padding: 6px 10px; }
       .color-chip { width: 30px; height: 30px; }
 
-      /* 入力欄を大きく（iOS zoom防止のためfont-size 16px以上） */
       .form-group input, .form-group select {
         font-size: 16px;
         padding: 12px 14px;
@@ -475,7 +467,7 @@
       <input type="file" id="fileInput" accept="audio/*, .mp3, .wav, .ogg, .m4a, .aac">
       <span class="dz-icon">🎵</span>
       クリックまたはドラッグ＆ドロップで音声ファイルを選択<br>
-      <small>MP3 / WAV / OGG / M4A 対応</small>
+      <small>MP3 / WAV / OGG / M4A 対応（※ブラウザの制限上、合計5MBまで。数KB〜数百KBの短いSEを推奨）</small>
       <div class="dz-filename" id="dzFilename"></div>
     </div>
 
@@ -722,7 +714,6 @@ dropZone.ondrop = (e) => {
 };
 fileInput.onchange = () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); };
 
-// 【修正箇所3】M4Aなどの拡張子にも寛容な判定にする
 function handleFile(f) {
   const validExts = ['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'];
   const isAudioType = f.type.startsWith('audio/');
